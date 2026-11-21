@@ -1,0 +1,10 @@
+# Frontend instructions
+
+Follow the [repository instructions](../AGENTS.md), the [architecture](../docs/architecture.md), and the [owning user story](../user%20stories/README.md).
+
+- Use Angular CLI and standalone components. Keep page orchestration in `src/app/pages/`, feature components in `src/app/features/`, and UI state near the component. Use signals for local state and an injectable session service for shared auth state. Clear task state when the session ends.
+- Keep Angular `HttpClient` services and transport types in `src/app/api/`. Use relative URLs through the Node server in Compose and the Angular CLI proxy for local iteration. Attach bearer tokens to protected requests in an interceptor, parse Problem Details consistently, and clear the expired session on a protected request's `401`.
+- Use typed reactive forms with visible labels, keyboard submission, pending feedback, and accessible field errors. Prevent duplicate submissions while a save is pending and preserve values on rejected saves. Keep server validation authoritative.
+- Follow the owning story for mutation feedback and data reloads. Render relevant loading, empty, success, and error states.
+- Every user-facing page must be responsive. Verify affected flows at mobile, tablet, and desktop widths before handoff. Navigation, forms, and task actions must stay usable without clipped controls or horizontal page scrolling. Check keyboard navigation and visible feedback.
+- Use Angular TestBed with the CLI-managed Vitest runner. Test visible behavior and use Angular's HTTP testing utilities to verify request contracts. Run `npm --prefix frontend test -- --watch=false` and `npm --prefix frontend run build` from the repository root.
