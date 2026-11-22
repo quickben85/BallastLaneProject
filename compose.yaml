@@ -1,3 +1,9 @@
+x-frontend-origins: &frontend-origins
+  Frontend__Origins__0: "http://localhost:${FRONTEND_PORT:-8088}"
+  Frontend__Origins__1: "http://127.0.0.1:${FRONTEND_PORT:-8088}"
+  Frontend__Origins__2: "http://localhost:4200"
+  Frontend__Origins__3: "http://127.0.0.1:4200"
+
 services:
   postgres:
     image: postgres:18
@@ -23,8 +29,20 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      <<: *frontend-origins
       ASPNETCORE_ENVIRONMENT: Development
+      Auth__PrivateKeyPath: /run/task-manager/accounts-private.pem
+      Demo__Seed: ${DEMO_SEED:-false}
       ConnectionStrings__Accounts: Host=postgres;Database=accounts;Username=accounts_app;Password=${ACCOUNTS_DB_PASSWORD:?Set ACCOUNTS_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5081:8080"
+    volumes:
+      - type: bind
+        source: ./.local/accounts-private.pem
+        target: /run/task-manager/accounts-private.pem
+        read_only: true
+        bind:
+          create_host_path: false
 
   tasks-api:
     build:
@@ -35,17 +53,25 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      <<: *frontend-origins
       ASPNETCORE_ENVIRONMENT: Development
+      Auth__PublicKeyPath: /run/task-manager/accounts-public.pem
       ConnectionStrings__Tasks: Host=postgres;Database=tasks;Username=tasks_app;Password=${TASKS_DB_PASSWORD:?Set TASKS_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5082:8080"
+    volumes:
+      - type: bind
+        source: ./.local/accounts-public.pem
+        target: /run/task-manager/accounts-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
 
   frontend:
     build: frontend
     depends_on:
       - accounts-api
       - tasks-api
-    environment:
-      ACCOUNTS_API_URL: http://accounts-api:8080
-      TASKS_API_URL: http://tasks-api:8080
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-8088}:8080"
     healthcheck:
@@ -55,7 +81,7 @@ services:
         - --input-type=module
         - -e
         - >-
-          for (const url of ['http://127.0.0.1:8080/', process.env.ACCOUNTS_API_URL + '/_internal/live', process.env.TASKS_API_URL + '/_internal/live']) {
+          for (const url of ['http://127.0.0.1:8080/', 'http://accounts-api:8080/_internal/live', 'http://tasks-api:8080/_internal/live']) {
             const response = await fetch(url, { signal: AbortSignal.timeout(2000) });
             if (!response.ok) process.exit(1);
             await response.body?.cancel();

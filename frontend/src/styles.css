@@ -1,1 +1,72 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  font-family: system-ui, sans-serif;
+  color: #182536;
+  background: #f3f6fa;
+  color-scheme: light;
+}
+
+body { margin: 0; }
+* { box-sizing: border-box; }
+button, input { font: inherit; }
+
+.auth-layout {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.panel {
+  width: 100%;
+  padding: clamp(1.25rem, 6vw, 2.5rem);
+  border: 1px solid #d6dee8;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 14px 32px #1825360d;
+}
+
+.auth-layout .panel { max-width: 27rem; }
+.product-name { margin: 0 0 0.4rem; color: #355370; font-weight: 650; }
+h1 { margin: 0; font-size: clamp(1.8rem, 6vw, 2.2rem); }
+form { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.field { display: grid; gap: 0.35rem; }
+label { font-weight: 600; }
+
+input {
+  min-width: 0;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #738497;
+  border-radius: 0.45rem;
+  color: inherit;
+}
+
+button {
+  min-height: 2.75rem;
+  padding: 0.6rem 1rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: #174b85;
+  color: #fff;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+button:hover { background: #123c6b; }
+button:disabled { opacity: 0.75; cursor: wait; }
+:focus-visible { outline: 3px solid #256ba9; outline-offset: 3px; }
+.error { margin: 0; color: #9a2424; font-size: 0.9rem; }
+
+.tasks-layout {
+  max-width: 65rem;
+  margin: 0 auto;
+  padding: clamp(1rem, 5vw, 3rem);
+}
+
+.tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
