@@ -5,7 +5,7 @@
 | Area | Choice |
 | --- | --- |
 | Backend | .NET 10 LTS, C#, ASP.NET Core Minimal APIs |
-| Application | Concrete use cases called directly by the API |
+| Application | Named use cases called by the API through Application-defined interfaces |
 | Persistence | PostgreSQL with Npgsql, Dapper, and SQL migrations tracked by DbUp |
 | Accounts | ASP.NET Core Identity with a PostgreSQL user store implemented using Dapper |
 | Request validation | FluentValidation in the ASP.NET Core API hosts |
@@ -42,11 +42,11 @@ user stories/
 - **Tasks API and Accounts API** each reference Application and Infrastructure. They own routing, transport models, response mapping, authentication configuration, and dependency injection. The two hosts have no project references to each other.
 - **Frontend** depends on the HTTP contracts. Angular owns pages, standalone components, state, forms, and API calls.
 
-Define repository and service dependency interfaces in Application. Inject those interfaces into use cases and register the implementations in each host. Keep named use cases, entities, DTOs, and simple validators concrete. See the [backend dependency examples](../backend/AGENTS.md#repository-and-service-interfaces).
+Define use-case, repository, and service interfaces in Application when they cross its boundary. Use internal interfaces for collaborators within Infrastructure and typed injection tokens for Angular service interfaces. Register concrete implementations at startup. Stateless static helpers can be called directly. Entities, DTOs, and framework-managed types use their concrete types where appropriate. See the [backend dependency examples](../backend/AGENTS.md#repository-and-service-interfaces).
 
 ## API boundaries
 
-The V6 “second API” requirement maps to two independently runnable ASP.NET Core hosts. **Accounts API** owns user creation and login. **Tasks API** owns task CRUD and enforces user isolation. Angular calls both APIs through same-origin relative URLs.
+The V6 “second API” requirement maps to two independently runnable ASP.NET Core hosts. **Accounts API** owns user creation and login. **Tasks API** owns task CRUD and enforces user isolation. Angular calls each API directly at its configured origin. The APIs use an explicit CORS allowlist for the local frontend origins. See the [ASP.NET Core CORS guidance](https://learn.microsoft.com/en-us/aspnet/core/security/cors?view=aspnetcore-10.0).
 
 Use camel-case JSON and Problem Details across both APIs. Route paths, methods, permissions, payloads, and status codes belong in the [user stories](../user%20stories/README.md).
 
@@ -57,17 +57,17 @@ Run each vertical slice against the shared Docker Compose stack, with one contai
 | Service | Responsibility |
 | --- | --- |
 | PostgreSQL | Hosts the `accounts` and `tasks` databases on a project-scoped named volume |
-| Accounts API | Runs the independent ASP.NET Core Accounts host |
-| Tasks API | Runs the independent ASP.NET Core Tasks host |
-| Frontend | Runs a minimal Node.js server that serves the built Angular app, supports client-side route refreshes, and proxies API requests |
+| Accounts API | Runs the independent ASP.NET Core Accounts host on local port `5081` |
+| Tasks API | Runs the independent ASP.NET Core Tasks host on local port `5082` |
+| Frontend | Runs a minimal Node.js static server on local port `8088` with support for client-side route refreshes |
 
-The frontend is the browser entry point. Node proxies requests to the correct API over the Compose network using service names. API responses retain their status, body, and contract headers. The Angular CLI dev server remains available for frontend iteration. See [Compose networking](https://docs.docker.com/compose/how-tos/networking/).
+Compose publishes the frontend and both API ports on loopback. PostgreSQL is accessed over the Compose network. The Angular CLI dev server on port `4200` uses the same API origins as the packaged frontend. See [Docker port publishing](https://docs.docker.com/engine/network/port-publishing/).
 
-Provision both databases before starting the API hosts. Use a PostgreSQL readiness check in Compose and apply migrations in each host before it begins serving traffic. Use independent Compose project names when a slice needs an isolated stack. See [Compose startup order](https://docs.docker.com/compose/how-tos/startup-order/).
+Provision both databases before starting the API hosts. Use a PostgreSQL readiness check in Compose and apply migrations in each host before it begins serving traffic. Run one stack at a time with the documented API ports. See [Compose startup order](https://docs.docker.com/compose/how-tos/startup-order/).
 
 ## Authentication
 
-Accounts API uses ASP.NET Core Identity for password hashing, validation, and sign-in lockout. For the local exercise, it issues short-lived JWTs using an RSA private key and sets the immutable user ID as `sub`. Tasks API uses the public key to validate the algorithm, signature, issuer, audience, lifetime, and subject. It validates tokens locally and uses the authenticated subject as the owner for each task operation.
+Accounts API uses ASP.NET Core Identity for password hashing and verification. For the local exercise, it issues short-lived JWTs using an RSA private key and sets the immutable user ID as `sub`. Tasks API uses the public key to validate the algorithm, signature, issuer, audience, lifetime, and subject. It validates tokens locally and uses the authenticated subject as the owner for each task operation.
 
 Angular keeps the token in memory and attaches it only to protected task requests. Reloading or session expiry requires sign-in. Signing out clears the token and task state. See the [ASP.NET Core JWT bearer guidance](https://learn.microsoft.com/aspnet/core/security/authentication/configure-jwt-bearer-authentication?view=aspnetcore-10.0).
 
