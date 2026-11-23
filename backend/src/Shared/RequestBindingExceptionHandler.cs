@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics;
 
-namespace TaskManager.Accounts.Api;
+namespace TaskManager.Web;
 
 internal sealed class RequestBindingExceptionHandler : IExceptionHandler
 {

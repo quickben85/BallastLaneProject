@@ -2,13 +2,14 @@
 
 Give `$implement-use-case` a short description of the behavior you want and any details you already know. You can also paste a draft using the template below. The owning story records the agreed behavior and HTTP contract before implementation.
 
-## Implemented example
+## Implemented user stories
 
-[Sign in to my account](sign-in.md) shows how to document acceptance criteria and an API contract.
+- [Sign in to my account](sign-in.md)
+- [Create a task and see it in my list](create-and-list-tasks.md)
 
 ## Use-case template
 
-Fill in what you know. Include the API contract section when the story changes an HTTP endpoint.
+Fill in what you know. Include the API contract section when the story changes an HTTP endpoint. Identify the resource and choose the method, route, and response codes using the [REST conventions](../backend/AGENTS.md#endpoints-and-use-cases).
 
 ```markdown
 # [Use-case title]

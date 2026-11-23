@@ -8,6 +8,8 @@ Declare each class, record class, and interface in its own C# file. Name the fil
 
 ## Endpoints and use cases
 
+- Design RESTful endpoints. Use plural nouns for collections and resource IDs for individual items. Use `GET` for reads, `POST` to create or submit, `PUT` to replace, `PATCH` for partial updates, and `DELETE` to remove a resource. Keep `GET` free of state changes.
+- Use HTTP status codes to report the result. Return `201 Created` with a `Location` header when creating a resource that has its own URL. Document the response and expected errors in the owning story.
 - Group Minimal API endpoints by resource. Require authorization on the task group. Declare public routes explicitly. Bind the request, obtain the trusted principal when needed, pass cancellation through, and map the use-case result to HTTP.
 - Configure CORS from the explicit frontend origin allowlist and run it before authorization. Preserve bearer-token validation on protected routes.
 - Derive the owner ID from the validated `sub` claim on every task operation. Treat owner ID, task ID on creation, and initial task status as server-owned. Apply ownership in the database query. Report missing and inaccessible items as the same `404`.
@@ -16,17 +18,19 @@ Declare each class, record class, and interface in its own C# file. Name the fil
 ## Request validation
 
 - Bind JSON request DTOs with `[FromBody]`. Handle body binding errors at the API host level so endpoints receive typed requests and malformed JSON gets a consistent `400` response.
-- Use FluentValidation for incoming request DTOs. Define concrete `AbstractValidator<TRequest>` classes in the owning API host and register them as `IValidator<TRequest>`.
+- Use FluentValidation for request-specific checks on incoming DTOs. Define concrete `AbstractValidator<TRequest>` classes in the owning API host and register them as `IValidator<TRequest>`.
 - In Minimal API handlers, call `ValidateAsync` with the request cancellation token before invoking the use case. Return field-keyed validation Problem Details using the JSON field names. See the [FluentValidation Minimal APIs guide](https://docs.fluentvalidation.net/en/latest/aspnet.html#minimal-apis).
-- Keep business invariants in Domain so they apply through every entry point. For example, the Domain enforces title length after trimming, and the API maps a rejected title to the `title` field.
+- Define task invariants once in the Domain FluentValidation rules. The Domain factory calls those rules so every new task meets them. Task title length after trimming and the earliest allowed due date belong here. The API maps Domain errors to JSON fields.
 
 ## Repository and service interfaces
 
 Inject every app-owned use case, repository, service, adapter, and validator through an interface. Use Application-defined interfaces across the Application boundary and internal interfaces for collaborators used only within Infrastructure. Register concrete implementations at startup and resolve dependencies by their interfaces, including when two interfaces share the same scoped implementation.
 
-Call stateless static helpers directly. Entities and DTOs are concrete data types. Framework entry points, framework-provided dependencies such as Identity managers, and direct construction of the implementation under test are also allowed. Register concrete validator implementations against `IValidator<TRequest>`.
+Call stateless static helpers directly. Entities and DTOs are concrete data types. Framework entry points, framework-provided dependencies such as Identity managers, and direct construction of the implementation under test are also allowed. Register API validators against `IValidator<TRequest>`.
 
 ### Repository example
+
+Name repository interfaces `I<Entity>Repository` and their production implementations `<Entity>Repository`. Keep persistence library names out of the types and filenames.
 
 Define `ITaskRepository` in Application. Keep its methods specific to the use case and include owner scope when operating on existing tasks. In this example, `TaskItem` is the Domain entity.
 
@@ -64,10 +68,16 @@ public sealed class GetTask(ITaskRepository tasks) : IGetTask
 }
 ```
 
-Implement `ITaskRepository` as `DapperTaskRepository` in Infrastructure. Filter by task ID and owner ID in SQL and complete the write before returning success. Keep Dapper and Npgsql types inside the adapter. Register the repository and use case against their interfaces in Tasks API.
+Implement `ITaskRepository` as `TaskRepository` in Infrastructure. Filter by task ID and owner ID in SQL and complete the write before returning success. Keep Dapper and Npgsql types inside the adapter. Register the repository in Infrastructure's `AddTaskPersistence` extension.
 
 ```csharp
-builder.Services.AddScoped<ITaskRepository, DapperTaskRepository>();
+services.AddScoped<ITaskRepository, TaskRepository>();
+```
+
+Call the extension and register the use case against its interface in the Tasks API composition root.
+
+```csharp
+builder.Services.AddTaskPersistence();
 builder.Services.AddScoped<IGetTask, GetTask>();
 ```
 
@@ -101,7 +111,7 @@ builder.Services.AddAccountServices();
 
 - Use Dapper parameter binding and Npgsql pooled connections. Open connections for the operation and dispose them promptly. Pass cancellation tokens to Dapper commands and use a transaction when multiple writes must succeed together.
 - Infrastructure owns the separate Accounts and Tasks SQL migration sets. Add a new versioned DbUp script for schema changes. Verify that fresh databases and existing databases can migrate with their data intact.
-- Keep demo data Development-only and opt-in. Seed users through Identity with the documented demo credentials and a stable user ID. Seed the task examples for that ID. Re-running setup must preserve existing user changes and avoid duplicate examples.
+- Keep demo account provisioning Development-only and opt-in. Use Identity with the documented demo credentials and a stable user ID. Re-running setup must preserve existing records.
 
 ## Test-driven development
 
