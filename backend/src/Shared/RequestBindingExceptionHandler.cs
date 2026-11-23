@@ -8,9 +8,17 @@ internal sealed class RequestBindingExceptionHandler : IExceptionHandler
     public async ValueTask<bool> TryHandleAsync(
         HttpContext context, Exception exception, CancellationToken cancellationToken)
     {
-        if (exception is not BadHttpRequestException { StatusCode: StatusCodes.Status400BadRequest } badRequest)
+        if (exception is not BadHttpRequestException
+            { StatusCode: >= StatusCodes.Status400BadRequest and < StatusCodes.Status500InternalServerError } badRequest)
         {
             return false;
+        }
+
+        context.Response.Headers.CacheControl = "no-store";
+        if (badRequest.StatusCode != StatusCodes.Status400BadRequest)
+        {
+            await Results.Problem(statusCode: badRequest.StatusCode).ExecuteAsync(context);
+            return true;
         }
 
         var field = GetErrorField((badRequest.InnerException as JsonException)?.Path);
@@ -18,7 +26,6 @@ internal sealed class RequestBindingExceptionHandler : IExceptionHandler
             ? "Send a valid JSON request body."
             : "Enter a valid value for this field.";
 
-        context.Response.Headers.CacheControl = "no-store";
         await Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] })
             .ExecuteAsync(context);
         return true;

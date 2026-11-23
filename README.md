@@ -221,3 +221,4 @@ dotnet test backend/tests/TaskManager.UnitTests/TaskManager.UnitTests.csproj
 2. Demonstrate the public health check, then sign in with the demo account.
 3. Show the create-and-list flow and the recorded red–green test for the title rule. Use the API integration test to demonstrate persistence and owner isolation in PostgreSQL.
 4. Select **Edit** on a task, update its details, and save it as **Completed**. Edit it again and choose **Open** to reopen it.
+5. Select **Delete** on a task and confirm it in the popup. Reload and sign in again to verify it stays gone.

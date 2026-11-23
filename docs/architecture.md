@@ -50,6 +50,8 @@ The V6 “second API” requirement maps to two independently runnable ASP.NET C
 
 Both APIs must expose RESTful endpoints. Model resources with resource-oriented URLs, use standard HTTP methods and status codes, and keep requests stateless. Use camel-case JSON and Problem Details. Route paths, methods, permissions, payloads, and status codes belong in the [owning user story](../user%20stories/README.md).
 
+Both API hosts use shared exception handlers. Request binding failures return safe client errors. Unexpected request failures return generic HTTP 500 Problem Details with a trace ID. The Development exception fallback uses the same response. Server logs record the exception details with the same trace ID.
+
 ## Local container topology
 
 Run each vertical slice against the shared Docker Compose stack, with one container per service.

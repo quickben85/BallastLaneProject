@@ -47,6 +47,14 @@ internal sealed class TaskRepository(NpgsqlDataSource dataSource) : ITaskReposit
         return rows.Select(row => row.ToDomain()).ToArray();
     }
 
+    public async Task<bool> DeleteForOwnerAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        const string sql = "DELETE FROM tasks.tasks WHERE id = @taskId AND owner_id = @ownerId";
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        return await connection.ExecuteAsync(new CommandDefinition(
+            sql, new { taskId, ownerId }, cancellationToken: cancellationToken)) == 1;
+    }
+
     public async Task<TaskItem?> FindForOwnerAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
     {
         var sql = TaskColumns + " WHERE id = @taskId AND owner_id = @ownerId";

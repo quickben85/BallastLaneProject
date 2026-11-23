@@ -16,6 +16,7 @@ internal static class TaskEndpoints
         tasks.MapGet("", ListAsync);
         tasks.MapGet("/{id:guid}", GetAsync).WithName("GetTaskById");
         tasks.MapPut("/{id:guid}", UpdateAsync);
+        tasks.MapDelete("/{id:guid}", DeleteAsync);
     }
 
     private static async Task<IResult> CreateAsync(
@@ -90,4 +91,11 @@ internal static class TaskEndpoints
     }
 
     private static Guid OwnerId(ClaimsPrincipal user) => Guid.Parse(user.FindFirstValue("sub")!);
+
+    private static async Task<IResult> DeleteAsync(
+        Guid id, IDeleteTask deleteTask, ClaimsPrincipal user, CancellationToken cancellationToken)
+    {
+        var deleted = await deleteTask.ExecuteAsync(id, OwnerId(user), cancellationToken);
+        return deleted ? Results.NoContent() : Results.NotFound();
+    }
 }

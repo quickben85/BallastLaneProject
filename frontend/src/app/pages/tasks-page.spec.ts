@@ -6,7 +6,7 @@ import { SESSION } from '../features/auth/session-state';
 
 const tasksUrl = 'http://localhost:5082/api/tasks';
 
-describe('Task creation and editing', () => {
+describe('Task management', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [...appConfig.providers, provideHttpClientTesting()],
@@ -195,7 +195,97 @@ describe('Task creation and editing', () => {
     expect(screen.querySelector('#task-title-error')?.textContent).toBe('Check the edit.');
     requests.expectNone({ method: 'GET', url: tasksUrl });
   });
+
+  it('opens the confirmation without deleting and allows Cancel or Escape', async () => {
+    const { dialog, page, requests, rowDelete, screen } = await openDeleteConfirmation();
+    requests.expectNone({ method: 'DELETE' });
+    expect(dialog.textContent).toContain('Task to delete');
+    dialog.querySelector<HTMLButtonElement>('.cancel-delete')!.click();
+    expect(dialog.open).toBe(false);
+    expect(screen.querySelector('.task-list')?.textContent).toContain('Task to delete');
+
+    rowDelete.click();
+    await page.fixture.whenStable();
+    expect(dialog.open).toBe(true);
+    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+    expect(dialog.open).toBe(false);
+    requests.expectNone({ method: 'DELETE' });
+  });
+
+  it('deletes only after confirmation and keeps the task gone when the list reloads', async () => {
+    const { dialog, page, requests, screen } = await openDeleteConfirmation();
+    requests.expectNone({ method: 'DELETE' });
+    const confirm = dialog.querySelector<HTMLButtonElement>('.confirm-delete')!;
+    confirm.click();
+    confirm.click();
+    const request = requests.expectOne({ method: 'DELETE', url: `${tasksUrl}/task-to-delete` });
+    expect(request.request.headers.get('Authorization')).toBe('Bearer token');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([]);
+    page.detectChanges();
+
+    expect(dialog.open).toBe(false);
+    expect(screen.querySelector('.task-list')).toBeNull();
+    expect(screen.textContent).toContain('No tasks yet.');
+    expect(screen.querySelector('[role="status"]')?.textContent).toBe('Task deleted.');
+  });
+
+  it('keeps the task and shows an error when a confirmed deletion fails', async () => {
+    const { dialog, page, requests, screen } = await openDeleteConfirmation();
+    dialog.querySelector<HTMLButtonElement>('.confirm-delete')!.click();
+    requests.expectOne({ method: 'DELETE', url: `${tasksUrl}/task-to-delete` }).flush(
+      {}, { status: 500, statusText: 'Server Error' },
+    );
+    page.detectChanges();
+
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector('[role="alert"]')?.textContent).toContain('Could not delete the task');
+    expect(screen.querySelector('.task-list')?.textContent).toContain('Task to delete');
+    requests.expectNone({ method: 'GET', url: tasksUrl });
+  });
+
+  it('removes the stale row when a confirmed deletion returns not found', async () => {
+    const { dialog, page, requests, screen } = await openDeleteConfirmation();
+    const confirm = dialog.querySelector<HTMLButtonElement>('.confirm-delete')!;
+    confirm.click();
+    requests.expectOne({ method: 'DELETE', url: `${tasksUrl}/task-to-delete` }).flush(
+      {}, { status: 404, statusText: 'Not Found' },
+    );
+    page.detectChanges();
+
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector('[role="alert"]')?.textContent).toBe('This task is no longer available.');
+    expect(screen.querySelector('.task-list')).toBeNull();
+    expect(confirm.disabled).toBe(true);
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([]);
+    dialog.querySelector<HTMLButtonElement>('.cancel-delete')!.click();
+    expect(dialog.open).toBe(false);
+    expect(document.activeElement?.id).toBe('task-list-title');
+  });
 });
+
+async function openDeleteConfirmation() {
+  const requests = TestBed.inject(HttpTestingController);
+  const page = await RouterTestingHarness.create('/tasks');
+  requests.expectOne({ method: 'GET', url: tasksUrl }).flush([
+    { id: 'task-to-delete', title: 'Task to delete', description: null, dueDate: null, status: 'open' },
+  ]);
+  page.detectChanges();
+  const screen = page.routeNativeElement!;
+  const dialog = screen.querySelector<HTMLDialogElement>('dialog');
+  const rowDelete = screen.querySelector<HTMLButtonElement>('.delete-task');
+  expect(dialog).not.toBeNull();
+  expect(rowDelete).not.toBeNull();
+
+  // Emulate the two native dialog methods in the DOM test environment.
+  dialog!.showModal = () => { dialog!.open = true; };
+  dialog!.close = () => { dialog!.open = false; };
+  rowDelete!.click();
+  await page.fixture.whenStable();
+  page.detectChanges();
+  expect(dialog!.open).toBe(true);
+  return { dialog: dialog!, page, requests, rowDelete: rowDelete!, screen };
+}
 
 function change(control: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   control.value = value;

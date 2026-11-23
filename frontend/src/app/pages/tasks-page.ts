@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
+import { afterNextRender, Component, DestroyRef, effect, inject, Injector, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -19,6 +19,7 @@ export class TasksPage {
   private readonly router = inject(Router);
   private readonly api = inject(TASKS_API);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private readonly reloadRequests = new Subject<void>();
 
   protected readonly tasks = signal<TaskSummary[]>([]);
@@ -28,6 +29,12 @@ export class TasksPage {
   protected readonly saveError = signal('');
   protected readonly saveMessage = signal('');
   protected readonly editingTask = signal<TaskSummary | null>(null);
+  protected readonly taskToDelete = signal<TaskSummary | null>(null);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal('');
+  protected readonly deleteMessage = signal('');
+  protected readonly deleteUnavailable = signal(false);
+  private deleteTrigger: HTMLButtonElement | null = null;
 
   protected readonly form = inject(FormBuilder).nonNullable.group({
     title: ['', (control: AbstractControl<string>) => {
@@ -101,6 +108,63 @@ export class TasksPage {
 
     this.restoreCreateDraft();
     this.saveError.set('');
+  }
+
+  protected requestDelete(task: TaskSummary, dialog: HTMLDialogElement, trigger: HTMLButtonElement): void {
+    if (this.taskToDelete() || this.saving() || this.editingTask()) return;
+
+    this.deleteTrigger = trigger;
+    this.deleteError.set('');
+    this.deleteMessage.set('');
+    this.deleteUnavailable.set(false);
+    this.taskToDelete.set(task);
+    afterNextRender(() => dialog.showModal(), { injector: this.injector });
+  }
+
+  protected cancelDelete(dialog: HTMLDialogElement, listHeading: HTMLHeadingElement, event?: Event): void {
+    event?.preventDefault();
+    if (this.deleting()) return;
+
+    dialog.close();
+    this.taskToDelete.set(null);
+    const focusTarget = this.deleteTrigger?.isConnected ? this.deleteTrigger : listHeading;
+    focusTarget.focus();
+    this.deleteTrigger = null;
+  }
+
+  protected confirmDelete(dialog: HTMLDialogElement, listHeading: HTMLHeadingElement): void {
+    const task = this.taskToDelete();
+    if (!task || !dialog.open || this.deleting() || this.deleteUnavailable()) return;
+
+    this.deleteError.set('');
+    this.deleting.set(true);
+    this.api.delete(task.id).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.deleting.set(false)),
+    ).subscribe({
+      next: () => {
+        dialog.close();
+        this.taskToDelete.set(null);
+        this.deleteTrigger = null;
+        listHeading.focus();
+        this.deleteMessage.set('Task deleted.');
+        this.removeDeletedTask(task.id);
+      },
+      error: (error: unknown) => {
+        if (error instanceof HttpErrorResponse && error.status === 404) {
+          this.deleteUnavailable.set(true);
+          this.deleteError.set('This task is no longer available.');
+          this.removeDeletedTask(task.id);
+          return;
+        }
+        this.deleteError.set('Could not delete the task. Try again.');
+      },
+    });
+  }
+
+  private removeDeletedTask(taskId: string): void {
+    this.tasks.update((tasks) => tasks.filter(({ id }) => id !== taskId));
+    this.reload();
   }
 
   protected save(dueDateInput: HTMLInputElement): void {

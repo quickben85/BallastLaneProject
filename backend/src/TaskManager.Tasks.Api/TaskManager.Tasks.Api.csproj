@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <Compile Include="../Shared/GlobalExceptionHandler.cs" Link="GlobalExceptionHandler.cs" />
     <Compile Include="../Shared/RequestBindingExceptionHandler.cs" Link="RequestBindingExceptionHandler.cs" />
   </ItemGroup>
 

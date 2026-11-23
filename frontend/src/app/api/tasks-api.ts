@@ -19,6 +19,10 @@ export class TasksApi implements TasksClient {
     return this.http.put<TaskSummary>(`${this.endpoint}/${encodeURIComponent(id)}`, request);
   }
 
+  delete(id: string) {
+    return this.http.delete<void>(`${this.endpoint}/${encodeURIComponent(id)}`);
+  }
+
   list() {
     return this.http.get<TaskSummary[]>(this.endpoint);
   }

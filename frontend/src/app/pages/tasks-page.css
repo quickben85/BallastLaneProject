@@ -24,7 +24,8 @@ textarea { resize: vertical; }
 .secondary { color: #174b85; background: #fff; border: 1px solid #738497; }
 .secondary:hover { background: #e9f1f8; }
 .secondary:disabled { cursor: default; }
-.edit-task { margin-top: 0.75rem; }
+.task-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.delete-task { color: #9a2424; }
 .save-confirmation { color: #286343; margin: 0; }
 .retry { margin-top: 0.75rem; }
 .task-list { list-style: none; padding: 0; margin: 0; }
@@ -34,6 +35,17 @@ textarea { resize: vertical; }
 .task-status { color: #214f77; background: #e9f1f8; border-radius: 1rem; padding: 0.2rem 0.6rem; font-size: 0.85rem; }
 .task-description { margin: 0.55rem 0 0; white-space: pre-wrap; }
 .task-date { margin: 0.55rem 0 0; color: #355370; }
+.delete-dialog {
+  width: min(26rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+.delete-dialog::backdrop { background: #18253680; }
+.delete-task-name { font-weight: 650; }
+.dialog-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 0.75rem; margin-top: 1.25rem; }
+.danger { background: #9a2424; }
+.danger:hover { background: #7d1c1c; }
 
 @media (max-width: 700px) {
   .tasks-content { grid-template-columns: minmax(0, 1fr); }

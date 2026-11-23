@@ -57,6 +57,8 @@ public sealed class TasksApiTests(LoginFixture fixture) : IClassFixture<LoginFix
         Assert.Equal(HttpStatusCode.NotFound, inaccessible.StatusCode);
         using var inaccessibleWrite = await other.PutAsJsonAsync(location, new { title = "Overwrite", status = "completed" });
         Assert.Equal(HttpStatusCode.NotFound, inaccessibleWrite.StatusCode);
+        using var inaccessibleDelete = await other.DeleteAsync(location);
+        Assert.Equal(HttpStatusCode.NotFound, inaccessibleDelete.StatusCode);
         Assert.Equal(created, await owner.GetFromJsonAsync<TaskResponse>(location));
         using var missing = await owner.GetAsync($"/api/tasks/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
@@ -168,6 +170,32 @@ public sealed class TasksApiTests(LoginFixture fixture) : IClassFixture<LoginFix
     }
 
     [Fact]
+    public async Task OwnerCanDeleteATaskAndItStaysGoneAcrossRequests()
+    {
+        using var client = fixture.Tasks.CreateClient();
+        await AuthenticateAsync(client);
+        using var creation = await client.PostAsJsonAsync("/api/tasks", new { title = "Task to delete" });
+        Assert.Equal(HttpStatusCode.Created, creation.StatusCode);
+        var task = await creation.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.NotNull(task);
+        Assert.Contains(task, (await client.GetFromJsonAsync<TaskResponse[]>("/api/tasks"))!);
+        var url = $"/api/tasks/{task.Id}";
+
+        using var deleted = await client.DeleteAsync(url);
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.Empty(await deleted.Content.ReadAsByteArrayAsync());
+
+        using var freshClient = fixture.Tasks.CreateClient();
+        await AuthenticateAsync(freshClient);
+        Assert.DoesNotContain((await freshClient.GetFromJsonAsync<TaskResponse[]>("/api/tasks"))!,
+            item => item.Id == task.Id);
+        using var missing = await freshClient.GetAsync(url);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        using var alreadyDeleted = await freshClient.DeleteAsync(url);
+        Assert.Equal(HttpStatusCode.NotFound, alreadyDeleted.StatusCode);
+    }
+
+    [Fact]
     public async Task RequiresAuthenticationForAllTaskRoutes()
     {
         using var client = fixture.Tasks.CreateClient();
@@ -176,11 +204,13 @@ public sealed class TasksApiTests(LoginFixture fixture) : IClassFixture<LoginFix
         using var get = await client.GetAsync($"/api/tasks/{Guid.NewGuid()}");
         using var update = await client.PutAsJsonAsync($"/api/tasks/{Guid.NewGuid()}",
             new { title = "Private", status = "open" });
+        using var delete = await client.DeleteAsync($"/api/tasks/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.Unauthorized, create.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, list.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, get.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, update.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, delete.StatusCode);
     }
 
     [Theory]

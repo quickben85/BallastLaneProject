@@ -19,6 +19,9 @@ internal sealed class FakeTaskRepository : ITaskRepository
     public Task<bool> UpdateAsync(TaskItem task, bool requireCurrentDueDate, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 
+    public Task<bool> DeleteForOwnerAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
     public Task<TaskItem?> FindForOwnerAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 }

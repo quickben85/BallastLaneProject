@@ -8,6 +8,7 @@ Give `$implement-use-case` a short description of the behavior you want and any 
 - [Sign in to my account](sign-in.md)
 - [Create a task and see it in my list](create-and-list-tasks.md)
 - [Update a task](update-a-task.md)
+- [Delete a task](delete-a-task.md)
 
 ## Use-case template
 
