@@ -220,3 +220,4 @@ dotnet test backend/tests/TaskManager.UnitTests/TaskManager.UnitTests.csproj
 1. Introduce the selected user story. Show the two API hosts and the dependency direction.
 2. Demonstrate the public health check, then sign in with the demo account.
 3. Show the create-and-list flow and the recorded red–green test for the title rule. Use the API integration test to demonstrate persistence and owner isolation in PostgreSQL.
+4. Select **Edit** on a task, update its details, and save it as **Completed**. Edit it again and choose **Open** to reopen it.

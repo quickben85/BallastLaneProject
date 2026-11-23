@@ -6,7 +6,7 @@ import { SESSION } from '../features/auth/session-state';
 
 const tasksUrl = 'http://localhost:5082/api/tasks';
 
-describe('Task creation', () => {
+describe('Task creation and editing', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [...appConfig.providers, provideHttpClientTesting()],
@@ -105,6 +105,95 @@ describe('Task creation', () => {
     requests.expectNone({ method: 'POST', url: tasksUrl });
     expect(title.value).toBe('Keep the draft');
     expect(screen.querySelector('#task-due-date-error')?.textContent).toContain('complete date');
+  });
+
+  it('edits an existing task and preserves its overdue date when completing it', async () => {
+    const requests = TestBed.inject(HttpTestingController);
+    const page = await RouterTestingHarness.create('/tasks');
+    const original = {
+      id: 'task-1', title: 'Original', description: 'Notes', dueDate: '2000-01-01', status: 'open',
+    };
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([original]);
+    page.detectChanges();
+    const screen = page.routeNativeElement!;
+    change(screen.querySelector<HTMLInputElement>('#task-title')!, 'Unfinished new task');
+    screen.querySelector<HTMLButtonElement>('.edit-task')!.click();
+    page.detectChanges();
+
+    const title = screen.querySelector<HTMLInputElement>('#task-title')!;
+    const date = screen.querySelector<HTMLInputElement>('#task-due-date')!;
+    expect(title.value).toBe('Original');
+    expect(date.value).toBe('2000-01-01');
+    change(title, 'Updated task');
+    const status = screen.querySelector<HTMLSelectElement>('#task-status')!;
+    status.value = 'completed';
+    status.dispatchEvent(new Event('change'));
+    submit(screen);
+
+    const save = requests.expectOne({ method: 'PUT', url: `${tasksUrl}/task-1` });
+    expect(save.request.headers.get('Authorization')).toBe('Bearer token');
+    expect(save.request.body).toMatchObject({
+      title: 'Updated task', description: 'Notes', status: 'completed', dueDate: '2000-01-01',
+    });
+    const updated = { ...original, title: 'Updated task', status: 'completed' };
+    save.flush(updated);
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([updated]);
+    page.detectChanges();
+
+    expect(screen.querySelector('.task-list')?.textContent).toContain('Updated task');
+    expect(screen.querySelector('.task-status')?.textContent).toBe('Completed');
+    expect(screen.querySelector('[role="status"]')?.textContent).toBe('Task updated.');
+    expect(title.value).toBe('Unfinished new task');
+  });
+
+  it('restores an unfinished new-task draft when cancelling an edit', async () => {
+    const requests = TestBed.inject(HttpTestingController);
+    const page = await RouterTestingHarness.create('/tasks');
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([
+      { id: 'task-1', title: 'Saved title', description: null, dueDate: null, status: 'open' },
+    ]);
+    page.detectChanges();
+    const screen = page.routeNativeElement!;
+    const title = screen.querySelector<HTMLInputElement>('#task-title')!;
+    const description = screen.querySelector<HTMLTextAreaElement>('#task-description')!;
+    const date = screen.querySelector<HTMLInputElement>('#task-due-date')!;
+    change(title, 'Unfinished new task');
+    change(description, 'Draft notes');
+    change(date, '2099-12-01');
+    screen.querySelector<HTMLButtonElement>('.edit-task')!.click();
+    page.detectChanges();
+    expect(title.value).toBe('Saved title');
+    screen.querySelector<HTMLButtonElement>('.form-actions .secondary')!.click();
+    page.detectChanges();
+
+    expect(title.value).toBe('Unfinished new task');
+    expect(description.value).toBe('Draft notes');
+    expect(date.value).toBe('2099-12-01');
+    requests.expectNone({ method: 'PUT', url: `${tasksUrl}/task-1` });
+  });
+
+  it('keeps the edit draft and leaves the task list unchanged when the API rejects an update', async () => {
+    const requests = TestBed.inject(HttpTestingController);
+    const page = await RouterTestingHarness.create('/tasks');
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([
+      { id: 'task-1', title: 'Saved title', description: null, dueDate: null, status: 'completed' },
+    ]);
+    page.detectChanges();
+    const screen = page.routeNativeElement!;
+    screen.querySelector<HTMLButtonElement>('.edit-task')!.click();
+    page.detectChanges();
+    const title = screen.querySelector<HTMLInputElement>('#task-title')!;
+    change(title, 'Keep this edit');
+    submit(screen);
+    requests.expectOne({ method: 'PUT', url: `${tasksUrl}/task-1` }).flush(
+      { errors: { title: ['Check the edit.'] } }, { status: 400, statusText: 'Bad Request' },
+    );
+    page.detectChanges();
+
+    expect(title.value).toBe('Keep this edit');
+    expect(screen.querySelector('.task-list')?.textContent).toContain('Saved title');
+    expect(screen.querySelector('#task-title-error')?.textContent).toBe('Check the edit.');
+    requests.expectNone({ method: 'GET', url: tasksUrl });
   });
 });
 

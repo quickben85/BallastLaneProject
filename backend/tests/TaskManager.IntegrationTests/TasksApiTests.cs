@@ -55,6 +55,9 @@ public sealed class TasksApiTests(LoginFixture fixture) : IClassFixture<LoginFix
         Assert.Empty((await other.GetFromJsonAsync<TaskResponse[]>("/api/tasks"))!);
         using var inaccessible = await other.GetAsync(location);
         Assert.Equal(HttpStatusCode.NotFound, inaccessible.StatusCode);
+        using var inaccessibleWrite = await other.PutAsJsonAsync(location, new { title = "Overwrite", status = "completed" });
+        Assert.Equal(HttpStatusCode.NotFound, inaccessibleWrite.StatusCode);
+        Assert.Equal(created, await owner.GetFromJsonAsync<TaskResponse>(location));
         using var missing = await owner.GetAsync($"/api/tasks/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
 
@@ -69,16 +72,115 @@ public sealed class TasksApiTests(LoginFixture fixture) : IClassFixture<LoginFix
     }
 
     [Fact]
+    public async Task OwnerCanReplaceEditableFieldsAndReopenTheSameTask()
+    {
+        using var client = fixture.Tasks.CreateClient();
+        await AuthenticateAsync(client);
+        using var creation = await client.PostAsJsonAsync("/api/tasks", new { title = "Original title" });
+        Assert.Equal(HttpStatusCode.Created, creation.StatusCode);
+        var original = await creation.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.NotNull(original);
+
+        var dueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2);
+        using var update = await client.PutAsJsonAsync($"/api/tasks/{original.Id}", new
+        {
+            title = "  Updated title  ",
+            description = "Updated description",
+            status = "completed",
+            dueDate
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var completed = new TaskResponse(original.Id, "Updated title", "Updated description", "completed", dueDate);
+        Assert.Equal(completed, await update.Content.ReadFromJsonAsync<TaskResponse>());
+        Assert.Contains(completed, (await client.GetFromJsonAsync<TaskResponse[]>("/api/tasks"))!);
+
+        using var reopened = await client.PutAsJsonAsync($"/api/tasks/{original.Id}", new
+        {
+            title = completed.Title,
+            status = "open"
+        });
+        Assert.Equal(HttpStatusCode.OK, reopened.StatusCode);
+        Assert.Equal(new TaskResponse(original.Id, completed.Title, null, "open", null),
+            await client.GetFromJsonAsync<TaskResponse>($"/api/tasks/{original.Id}"));
+    }
+
+    [Fact]
+    public async Task AnOverdueDateCanBeKeptOrClearedButCannotBeChangedToAnotherPastDate()
+    {
+        using var client = fixture.Tasks.CreateClient();
+        await AuthenticateAsync(client);
+        using var creation = await client.PostAsJsonAsync("/api/tasks", new { title = "Overdue task" });
+        Assert.Equal(HttpStatusCode.Created, creation.StatusCode);
+        var original = await creation.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.NotNull(original);
+
+        var overdue = new DateOnly(2000, 1, 1);
+        await using (var connection = new NpgsqlConnection(fixture.TasksConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand("UPDATE tasks.tasks SET due_date = @dueDate WHERE id = @id", connection);
+            command.Parameters.AddWithValue("dueDate", overdue);
+            command.Parameters.AddWithValue("id", original.Id);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        }
+
+        var url = $"/api/tasks/{original.Id}";
+        using var rejected = await client.PutAsJsonAsync(url,
+            new { title = "Rejected edit", status = "completed", dueDate = overdue.AddDays(1) });
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        var validation = await rejected.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.NotNull(validation);
+        Assert.Contains("dueDate", validation.Errors.Keys);
+        Assert.Equal(original with { DueDate = overdue }, await client.GetFromJsonAsync<TaskResponse>(url));
+
+        using var complete = await client.PutAsJsonAsync(url,
+            new { title = original.Title, status = "completed", dueDate = overdue });
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        Assert.Equal(original with { DueDate = overdue, Status = "completed" },
+            await client.GetFromJsonAsync<TaskResponse>(url));
+
+        using var clear = await client.PutAsJsonAsync(url,
+            new { title = original.Title, status = "open", dueDate = (DateOnly?)null });
+        Assert.Equal(HttpStatusCode.OK, clear.StatusCode);
+        Assert.Equal(original, await client.GetFromJsonAsync<TaskResponse>(url));
+    }
+
+    [Theory]
+    [InlineData("""{"title":"   ","status":"open"}""", "title")]
+    [InlineData("""{"title":"Edited","status":"pending"}""", "status")]
+    [InlineData("""{"title":"Edited"}""", "status")]
+    public async Task InvalidUpdatesLeaveTheStoredTaskUnchanged(string json, string field)
+    {
+        using var client = fixture.Tasks.CreateClient();
+        await AuthenticateAsync(client);
+        using var creation = await client.PostAsJsonAsync("/api/tasks", new { title = "Saved task", description = "Original" });
+        var original = await creation.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.NotNull(original);
+        var url = $"/api/tasks/{original.Id}";
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        using var rejected = await client.PutAsync(url, content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        var validation = await rejected.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.NotNull(validation);
+        Assert.Contains(field, validation.Errors.Keys);
+        Assert.Equal(original, await client.GetFromJsonAsync<TaskResponse>(url));
+    }
+
+    [Fact]
     public async Task RequiresAuthenticationForAllTaskRoutes()
     {
         using var client = fixture.Tasks.CreateClient();
         using var create = await client.PostAsJsonAsync("/api/tasks", new { title = "Private" });
         using var list = await client.GetAsync("/api/tasks");
         using var get = await client.GetAsync($"/api/tasks/{Guid.NewGuid()}");
+        using var update = await client.PutAsJsonAsync($"/api/tasks/{Guid.NewGuid()}",
+            new { title = "Private", status = "open" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, create.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, list.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, get.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, update.StatusCode);
     }
 
     [Theory]

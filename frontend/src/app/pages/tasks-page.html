@@ -8,13 +8,13 @@
   </header>
 
   <div class="tasks-content">
-    <section class="panel" aria-labelledby="new-task-title">
-      <h2 id="new-task-title">New task</h2>
+    <section class="panel" aria-labelledby="task-form-title">
+      <h2 id="task-form-title">{{ editingTask() ? 'Edit task' : 'New task' }}</h2>
       <form [formGroup]="form" (ngSubmit)="save(dueDateInput)" novalidate>
         <fieldset [disabled]="saving()">
           <div class="field">
             <label for="task-title">Title</label>
-            <input id="task-title" formControlName="title" required
+            <input #titleInput id="task-title" formControlName="title" required
               [attr.aria-invalid]="!!fieldError('title')"
               [attr.aria-describedby]="fieldError('title') ? 'task-title-error' : null">
             @if (fieldError('title'); as error) {
@@ -39,7 +39,26 @@
               <p id="task-due-date-error" class="error" role="alert">{{ error }}</p>
             }
           </div>
-          <button type="submit">{{ saving() ? 'Saving…' : 'Create task' }}</button>
+          @if (editingTask()) {
+            <div class="field">
+              <label for="task-status">Status</label>
+              <select id="task-status" formControlName="status" required
+                [attr.aria-invalid]="!!fieldError('status')"
+                [attr.aria-describedby]="fieldError('status') ? 'task-status-error' : null">
+                <option value="open">Open</option>
+                <option value="completed">Completed</option>
+              </select>
+              @if (fieldError('status'); as error) {
+                <p id="task-status-error" class="error" role="alert">{{ error }}</p>
+              }
+            </div>
+          }
+          <div class="form-actions">
+            <button type="submit">{{ saving() ? 'Saving…' : editingTask() ? 'Save changes' : 'Create task' }}</button>
+            @if (editingTask()) {
+              <button type="button" class="secondary" (click)="cancelEdit()">Cancel</button>
+            }
+          </div>
         </fieldset>
         @if (saveError()) {
           <p class="error" role="alert">{{ saveError() }}</p>
@@ -73,6 +92,9 @@
               @if (task.dueDate) {
                 <p class="task-date">Due <time [attr.datetime]="task.dueDate">{{ task.dueDate }}</time></p>
               }
+              <button type="button" class="secondary edit-task"
+                [disabled]="saving() || !!editingTask()"
+                [attr.aria-label]="'Edit ' + task.title" (click)="edit(task, titleInput, dueDateInput)">Edit</button>
             </li>
           }
         </ul>

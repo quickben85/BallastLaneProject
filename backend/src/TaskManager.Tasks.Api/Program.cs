@@ -17,7 +17,9 @@ public sealed class Program
         builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
         builder.Services.AddExceptionHandler<RequestBindingExceptionHandler>();
         builder.Services.AddScoped<IValidator<CreateTaskRequest>, CreateTaskRequestValidator>();
+        builder.Services.AddScoped<IValidator<UpdateTaskRequest>, UpdateTaskRequestValidator>();
         builder.Services.AddScoped<ICreateTask, CreateTask>();
+        builder.Services.AddScoped<IUpdateTask, UpdateTask>();
         builder.Services.AddScoped<ITaskQueries, TaskQueries>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddTaskPersistence();
