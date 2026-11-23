@@ -4,6 +4,8 @@ import { provideRouter } from '@angular/router';
 import { AccountsApi } from './api/accounts-api';
 import { ACCOUNTS_API } from './api/accounts-client';
 import { taskAuthInterceptor } from './api/task-auth.interceptor';
+import { TasksApi } from './api/tasks-api';
+import { TASKS_API } from './api/tasks-client';
 import { routes } from './app.routes';
 import { Session } from './features/auth/session';
 import { SESSION } from './features/auth/session-state';
@@ -15,5 +17,6 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([taskAuthInterceptor])),
     { provide: ACCOUNTS_API, useClass: AccountsApi },
     { provide: SESSION, useClass: Session },
+    { provide: TASKS_API, useClass: TasksApi },
   ],
 };

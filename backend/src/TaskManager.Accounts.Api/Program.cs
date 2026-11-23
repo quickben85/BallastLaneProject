@@ -2,6 +2,7 @@ using FluentValidation;
 using TaskManager.Application.Accounts;
 using TaskManager.Infrastructure;
 using TaskManager.Infrastructure.Accounts;
+using TaskManager.Web;
 
 namespace TaskManager.Accounts.Api;
 

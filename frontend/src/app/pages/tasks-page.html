@@ -1,0 +1,84 @@
+<main class="tasks-layout">
+  <header class="panel tasks-header">
+    <div>
+      <p class="product-name">Task Manager</p>
+      <h1>Your tasks</h1>
+    </div>
+    <button type="button" (click)="session.end()">Sign out</button>
+  </header>
+
+  <div class="tasks-content">
+    <section class="panel" aria-labelledby="new-task-title">
+      <h2 id="new-task-title">New task</h2>
+      <form [formGroup]="form" (ngSubmit)="save(dueDateInput)" novalidate>
+        <fieldset [disabled]="saving()">
+          <div class="field">
+            <label for="task-title">Title</label>
+            <input id="task-title" formControlName="title" required
+              [attr.aria-invalid]="!!fieldError('title')"
+              [attr.aria-describedby]="fieldError('title') ? 'task-title-error' : null">
+            @if (fieldError('title'); as error) {
+              <p id="task-title-error" class="error" role="alert">{{ error }}</p>
+            }
+          </div>
+          <div class="field">
+            <label for="task-description">Description <span>(optional)</span></label>
+            <textarea id="task-description" formControlName="description" rows="3"
+              [attr.aria-invalid]="!!fieldError('description')"
+              [attr.aria-describedby]="fieldError('description') ? 'task-description-error' : null"></textarea>
+            @if (fieldError('description'); as error) {
+              <p id="task-description-error" class="error" role="alert">{{ error }}</p>
+            }
+          </div>
+          <div class="field">
+            <label for="task-due-date">Due date <span>(optional)</span></label>
+            <input #dueDateInput id="task-due-date" type="date" formControlName="dueDate" [min]="today()"
+              [attr.aria-invalid]="!!fieldError('dueDate')"
+              [attr.aria-describedby]="fieldError('dueDate') ? 'task-due-date-error' : null">
+            @if (fieldError('dueDate'); as error) {
+              <p id="task-due-date-error" class="error" role="alert">{{ error }}</p>
+            }
+          </div>
+          <button type="submit">{{ saving() ? 'Saving…' : 'Create task' }}</button>
+        </fieldset>
+        @if (saveError()) {
+          <p class="error" role="alert">{{ saveError() }}</p>
+        }
+        @if (saveMessage()) {
+          <p class="save-confirmation" role="status">{{ saveMessage() }}</p>
+        }
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="task-list-title">
+      <h2 id="task-list-title">Task list</h2>
+      @if (listLoading()) {
+        <p role="status">Loading tasks…</p>
+      }
+      @if (listError()) {
+        <p class="error" role="alert">Could not load your tasks.</p>
+        <button class="retry" type="button" (click)="reload()">Retry loading tasks</button>
+      }
+      @if (tasks().length) {
+        <ul class="task-list">
+          @for (task of tasks(); track task.id) {
+            <li class="task-item">
+              <div class="task-heading">
+                <h3>{{ task.title }}</h3>
+                <span class="task-status">{{ task.status === 'open' ? 'Open' : 'Completed' }}</span>
+              </div>
+              @if (task.description) {
+                <p class="task-description">{{ task.description }}</p>
+              }
+              @if (task.dueDate) {
+                <p class="task-date">Due <time [attr.datetime]="task.dueDate">{{ task.dueDate }}</time></p>
+              }
+            </li>
+          }
+        </ul>
+      } @else if (!listLoading() && !listError()) {
+        <p>No tasks yet.</p>
+      }
+    </section>
+  </div>
+</main>

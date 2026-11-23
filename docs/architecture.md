@@ -8,7 +8,7 @@
 | Application | Named use cases called by the API through Application-defined interfaces |
 | Persistence | PostgreSQL with Npgsql, Dapper, and SQL migrations tracked by DbUp |
 | Accounts | ASP.NET Core Identity with a PostgreSQL user store implemented using Dapper |
-| Request validation | FluentValidation in the ASP.NET Core API hosts |
+| Validation | FluentValidation for request checks in API hosts and task invariants in Domain |
 | Frontend | Angular 21 LTS, Angular CLI, standalone components, TypeScript, and responsive CSS |
 | Local runtime | Docker Compose with PostgreSQL, two ASP.NET Core hosts, and a minimal Node.js frontend server |
 | Tests | xUnit and WebApplicationFactory for the backend, Angular TestBed and CLI-managed Vitest for the frontend |
@@ -36,9 +36,9 @@ frontend/
 user stories/
 ```
 
-- **Domain** owns the task entity and its invariants. It has no project references or framework dependencies.
+- **Domain** owns the task entity and its invariants. It references FluentValidation to enforce task rules when creating entities. It has no project references.
 - **Application** depends on Domain. It owns use cases, their inputs and results, and interfaces for outside dependencies such as `ITaskRepository`.
-- **Infrastructure** depends on Application and Domain. It implements the dependency interfaces and owns Dapper queries, PostgreSQL connections, SQL migrations, and seed routines. It implements the custom user store behind Identity's storage interfaces.
+- **Infrastructure** depends on Application and Domain. It implements the dependency interfaces and owns Dapper queries, PostgreSQL connections, SQL migrations, and demo account provisioning. It implements the custom user store behind Identity's storage interfaces.
 - **Tasks API and Accounts API** each reference Application and Infrastructure. They own routing, transport models, response mapping, authentication configuration, and dependency injection. The two hosts have no project references to each other.
 - **Frontend** depends on the HTTP contracts. Angular owns pages, standalone components, state, forms, and API calls.
 
@@ -48,7 +48,7 @@ Define use-case, repository, and service interfaces in Application when they cro
 
 The V6 “second API” requirement maps to two independently runnable ASP.NET Core hosts. **Accounts API** owns user creation and login. **Tasks API** owns task CRUD and enforces user isolation. Angular calls each API directly at its configured origin. The APIs use an explicit CORS allowlist for the local frontend origins. See the [ASP.NET Core CORS guidance](https://learn.microsoft.com/en-us/aspnet/core/security/cors?view=aspnetcore-10.0).
 
-Use camel-case JSON and Problem Details across both APIs. Route paths, methods, permissions, payloads, and status codes belong in the [user stories](../user%20stories/README.md).
+Both APIs must expose RESTful endpoints. Model resources with resource-oriented URLs, use standard HTTP methods and status codes, and keep requests stateless. Use camel-case JSON and Problem Details. Route paths, methods, permissions, payloads, and status codes belong in the [owning user story](../user%20stories/README.md).
 
 ## Local container topology
 
@@ -73,8 +73,10 @@ Angular keeps the token in memory and attaches it only to protected task request
 
 ## Persistence
 
-Use one PostgreSQL instance with separate `accounts` and `tasks` databases. Accounts owns the user records. Tasks owns task records with a unique ID, owner ID, title, optional description, and status. Tasks stores the owner's immutable user ID and never reads the accounts database.
+Use one PostgreSQL instance with separate `accounts` and `tasks` databases. Accounts owns the user records. Tasks owns task records with a unique ID, owner ID, title, optional description, status, and an optional date-only due date. Tasks stores the owner's immutable user ID and never reads the accounts database.
 
 Open pooled connections through Npgsql and use parameterized SQL through Dapper. Scope task queries and mutations by owner in SQL. Infrastructure keeps versioned SQL scripts and migration history separate for each database. Each API applies only the migrations for its database on Development startup. Integration tests use isolated PostgreSQL databases and apply the same migrations.
 
-Development demo seeding is opt-in. Accounts seeds a user through Identity with a stable user ID, and Tasks seeds sample records for that ID once per tasks database. Record seed completion in the same transaction as the task inserts to preserve edits and deletions across subsequent runs.
+Repository names describe the entity they store. Application defines `ITaskRepository`, and Infrastructure implements it as `TaskRepository` using Dapper and Npgsql internally.
+
+Accounts can provision a demo user through Identity with a stable user ID when explicitly enabled in Development. A new task list is empty until its owner creates a task.

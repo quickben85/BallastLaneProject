@@ -1,0 +1,63 @@
+using System.Security.Claims;
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using TaskManager.Application.Tasks;
+
+namespace TaskManager.Tasks.Api;
+
+internal static class TaskEndpoints
+{
+    public static void MapTaskEndpoints(this WebApplication app)
+    {
+        var tasks = app.MapGroup("/api/tasks").RequireAuthorization();
+        tasks.MapPost("", CreateAsync);
+        tasks.MapGet("", ListAsync);
+        tasks.MapGet("/{id:guid}", GetAsync).WithName("GetTaskById");
+    }
+
+    private static async Task<IResult> CreateAsync(
+        [FromBody] CreateTaskRequest request, IValidator<CreateTaskRequest> validator,
+        ICreateTask createTask, ClaimsPrincipal user, CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return Results.ValidationProblem(validation.ToDictionary());
+        }
+
+        var zone = request.TimeZone is null ? TimeZoneInfo.Utc : TimeZoneInfo.FindSystemTimeZoneById(request.TimeZone);
+        var result = await createTask.ExecuteAsync(OwnerId(user), request.Title, request.Description,
+            request.DueDate, zone, cancellationToken);
+        if (result.Item is { } task)
+        {
+            return Results.CreatedAtRoute("GetTaskById", new { id = task.Id }, TaskResource.From(task));
+        }
+
+        var errors = new Dictionary<string, string[]>();
+        if (result.TitleError is { } titleError)
+        {
+            errors.Add("title", [titleError]);
+        }
+        if (result.DueDateError is { } dueDateError)
+        {
+            errors.Add("dueDate", [dueDateError]);
+        }
+        return Results.ValidationProblem(errors);
+    }
+
+    private static async Task<IResult> ListAsync(
+        ITaskQueries queries, ClaimsPrincipal user, CancellationToken cancellationToken)
+    {
+        var tasks = await queries.ListAsync(OwnerId(user), cancellationToken);
+        return Results.Ok(tasks.Select(TaskResource.From));
+    }
+
+    private static async Task<IResult> GetAsync(
+        Guid id, ITaskQueries queries, ClaimsPrincipal user, CancellationToken cancellationToken)
+    {
+        var task = await queries.GetAsync(id, OwnerId(user), cancellationToken);
+        return task is null ? Results.NotFound() : Results.Ok(TaskResource.From(task));
+    }
+
+    private static Guid OwnerId(ClaimsPrincipal user) => Guid.Parse(user.FindFirstValue("sub")!);
+}
