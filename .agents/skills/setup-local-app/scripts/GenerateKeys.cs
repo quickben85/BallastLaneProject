@@ -15,8 +15,8 @@ try
     ProtectKeyDirectory(directory);
     var privatePath = Path.Combine(directory.FullName, "accounts-private.pem");
     var publicPath = Path.Combine(directory.FullName, "accounts-public.pem");
-    RequireRegularKeyPath(privatePath);
-    RequireRegularKeyPath(publicPath);
+    RequireRegularFilePath(privatePath);
+    RequireRegularFilePath(publicPath);
 
     using var key = RSA.Create(2048);
     if (File.Exists(privatePath))
@@ -69,7 +69,8 @@ try
         File.SetUnixFileMode(publicPath, containerReadable);
     }
 
-    Console.WriteLine("Local signing key pair ready in .local/.");
+    Console.WriteLine("Local signing files ready in .local/.");
+    ConfigureComposeEnvironment();
     return 0;
 }
 catch (Exception error) when (error is IOException or UnauthorizedAccessException or CryptographicException
@@ -79,7 +80,70 @@ catch (Exception error) when (error is IOException or UnauthorizedAccessExceptio
     return 1;
 }
 
-static void RequireRegularKeyPath(string path)
+static void ConfigureComposeEnvironment()
+{
+    const string path = ".env";
+    RequireRegularFilePath(path);
+    var options = new FileStreamOptions
+    {
+        Mode = FileMode.OpenOrCreate,
+        Access = FileAccess.ReadWrite,
+        Share = FileShare.Read
+    };
+    if (!OperatingSystem.IsWindows())
+    {
+        options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+    }
+
+    using var stream = new FileStream(path, options);
+    string contents;
+    using (var reader = new StreamReader(stream, leaveOpen: true))
+    {
+        contents = reader.ReadToEnd();
+    }
+
+    string[] requiredVariables = ["POSTGRES_PASSWORD", "ACCOUNTS_DB_PASSWORD", "TASKS_DB_PASSWORD"];
+    var existingVariables = contents.Split('\n').Select(ReadVariableName).ToHashSet(StringComparer.Ordinal);
+    var missingVariables = requiredVariables.Where(variable => !existingVariables.Contains(variable)
+        && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable))).ToArray();
+
+    if (missingVariables.Length == 0)
+    {
+        Console.WriteLine("Compose database settings already supplied.");
+        return;
+    }
+
+    stream.Seek(0, SeekOrigin.End);
+    using var writer = new StreamWriter(stream)
+    {
+        NewLine = contents.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n"
+    };
+    if (contents.Length > 0 && !contents.EndsWith('\n'))
+    {
+        writer.WriteLine();
+    }
+
+    foreach (var variable in missingVariables)
+    {
+        writer.WriteLine($"{variable}={Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}");
+    }
+    writer.Flush();
+    Console.WriteLine($"Added missing Compose settings to .env: {string.Join(", ", missingVariables)}.");
+}
+
+static string ReadVariableName(string line)
+{
+    line = line.TrimStart();
+    if (line.StartsWith("export ", StringComparison.Ordinal))
+    {
+        line = line[7..].TrimStart();
+    }
+
+    var separator = line.IndexOfAny(['=', ':']);
+    return (separator >= 0 ? line[..separator] : line).Trim();
+}
+
+static void RequireRegularFilePath(string path)
 {
     if (Directory.Exists(path) || new FileInfo(path).LinkTarget is not null)
     {
