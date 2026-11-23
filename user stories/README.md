@@ -4,6 +4,7 @@ Give `$implement-use-case` a short description of the behavior you want and any 
 
 ## Implemented user stories
 
+- [Register an account](register-an-account.md)
 - [Sign in to my account](sign-in.md)
 - [Create a task and see it in my list](create-and-list-tasks.md)
 

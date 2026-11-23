@@ -2,6 +2,9 @@
   <section class="panel" aria-labelledby="login-title">
     <p class="product-name">Task Manager</p>
     <h1 id="login-title">Sign in</h1>
+    @if (accountCreated) {
+      <p role="status">Account created. Sign in to continue.</p>
+    }
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       @let emailError = fieldErrors().email ?? (form.controls.email.touched && form.controls.email.invalid
@@ -32,5 +35,6 @@
       }
       <button type="submit" [disabled]="pending()">{{ pending() ? 'Signing in…' : 'Sign in' }}</button>
     </form>
+    <p>New to Task Manager? <a routerLink="/register">Create an account</a></p>
   </section>
 </main>

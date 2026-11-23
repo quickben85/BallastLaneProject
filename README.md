@@ -193,6 +193,8 @@ Press Ctrl+C in each terminal to stop the frontend and APIs. PostgreSQL keeps th
 
 Compose reads `DEMO_SEED=true` from `.env`. The native instructions set `Demo__Seed=true` in the Accounts API terminal. Sign in, enter a title, add an optional description or due date, and select **Create task**. The saved task appears in your private list. Use **Sign out** to return to sign-in.
 
+To demonstrate registration, choose **Create an account** on the sign-in page. Register with an email and password, then sign in to see the new account's empty task list.
+
 ## Build and test
 
 ```sh

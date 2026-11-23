@@ -20,7 +20,9 @@ public sealed class Program
             .AllowAnyHeader()
             .AllowAnyMethod()));
         builder.Services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
+        builder.Services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
         builder.Services.AddScoped<ISignIn, SignIn>();
+        builder.Services.AddScoped<IRegisterAccount, RegisterAccount>();
         builder.Services.AddAccountServices();
 
         var app = builder.Build();
@@ -41,6 +43,8 @@ public sealed class Program
         app.UseExceptionHandler();
         app.UseCors();
         app.MapPost("/api/accounts/login", LoginEndpoint.HandleAsync)
+            .AllowAnonymous();
+        app.MapPost("/api/accounts/register", RegisterEndpoint.HandleAsync)
             .AllowAnonymous();
         app.MapHealthChecks("/_internal/live");
         await app.RunAsync();

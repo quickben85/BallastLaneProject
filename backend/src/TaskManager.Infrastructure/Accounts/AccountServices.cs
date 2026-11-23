@@ -14,9 +14,12 @@ public static class AccountServices
             provider.GetRequiredService<IConfiguration>().GetConnectionString("Accounts")
             ?? throw new InvalidOperationException("Configure ConnectionStrings:Accounts.")));
 
-        services.AddIdentityCore<IdentityUser<Guid>>()
+        services.AddIdentityCore<IdentityUser<Guid>>(options =>
+            // The Accounts API validates email addresses before using them as usernames.
+            options.User.AllowedUserNameCharacters = string.Empty)
             .AddUserStore<DapperUserStore>();
         services.AddScoped<IAccountCredentials, IdentityAccountCredentials>();
+        services.AddScoped<IAccountRegistration, IdentityAccountRegistration>();
         services.AddSingleton<IAccessTokenIssuer>(provider => new RsaJwtAccessTokenIssuer(
             provider.GetRequiredService<IConfiguration>()["Auth:PrivateKeyPath"]
             ?? throw new InvalidOperationException("Configure Auth:PrivateKeyPath.")));
