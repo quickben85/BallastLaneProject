@@ -7,6 +7,7 @@ import { UpdateTaskRequest } from './update-task-request';
 export interface TasksClient {
   create(request: CreateTaskRequest): Observable<TaskSummary>;
   update(id: string, request: UpdateTaskRequest): Observable<TaskSummary>;
+  delete(id: string): Observable<void>;
   list(): Observable<TaskSummary[]>;
 }
 

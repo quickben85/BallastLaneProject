@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using TaskManager.Application.Tasks;
 using TaskManager.Infrastructure;
@@ -16,10 +17,13 @@ public sealed class Program
         builder.Services.AddProblemDetails();
         builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
         builder.Services.AddExceptionHandler<RequestBindingExceptionHandler>();
+        builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        builder.Services.AddSingleton<IDeveloperPageExceptionFilter, GlobalExceptionHandler>();
         builder.Services.AddScoped<IValidator<CreateTaskRequest>, CreateTaskRequestValidator>();
         builder.Services.AddScoped<IValidator<UpdateTaskRequest>, UpdateTaskRequestValidator>();
         builder.Services.AddScoped<ICreateTask, CreateTask>();
         builder.Services.AddScoped<IUpdateTask, UpdateTask>();
+        builder.Services.AddScoped<IDeleteTask, DeleteTask>();
         builder.Services.AddScoped<ITaskQueries, TaskQueries>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddTaskPersistence();
@@ -49,6 +53,7 @@ public sealed class Program
         }
 
         app.UseExceptionHandler();
+        app.UseRouting();
         app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();

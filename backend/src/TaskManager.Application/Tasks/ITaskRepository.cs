@@ -6,6 +6,7 @@ public interface ITaskRepository
 {
     Task AddAsync(TaskItem task, CancellationToken cancellationToken);
     Task<bool> UpdateAsync(TaskItem task, bool requireCurrentDueDate, CancellationToken cancellationToken);
+    Task<bool> DeleteForOwnerAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TaskItem>> ListForOwnerAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<TaskItem?> FindForOwnerAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken);
 }

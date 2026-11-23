@@ -70,7 +70,10 @@
     </section>
 
     <section class="panel" aria-labelledby="task-list-title">
-      <h2 id="task-list-title">Task list</h2>
+      <h2 #taskListHeading id="task-list-title" tabindex="-1">Task list</h2>
+      @if (deleteMessage()) {
+        <p class="save-confirmation" role="status">{{ deleteMessage() }}</p>
+      }
       @if (listLoading()) {
         <p role="status">Loading tasks…</p>
       }
@@ -92,9 +95,14 @@
               @if (task.dueDate) {
                 <p class="task-date">Due <time [attr.datetime]="task.dueDate">{{ task.dueDate }}</time></p>
               }
-              <button type="button" class="secondary edit-task"
-                [disabled]="saving() || !!editingTask()"
-                [attr.aria-label]="'Edit ' + task.title" (click)="edit(task, titleInput, dueDateInput)">Edit</button>
+              <div class="task-actions">
+                <button type="button" class="secondary edit-task"
+                  [disabled]="saving() || !!editingTask()"
+                  [attr.aria-label]="'Edit ' + task.title" (click)="edit(task, titleInput, dueDateInput)">Edit</button>
+                <button #deleteButton type="button" class="secondary delete-task"
+                  [disabled]="saving() || !!editingTask()" [attr.aria-label]="'Delete ' + task.title"
+                  (click)="requestDelete(task, deleteDialog, deleteButton)">Delete</button>
+              </div>
             </li>
           }
         </ul>
@@ -103,4 +111,20 @@
       }
     </section>
   </div>
+
+  <dialog #deleteDialog class="panel delete-dialog" aria-labelledby="delete-task-title"
+    aria-describedby="delete-task-name delete-task-description" (cancel)="cancelDelete(deleteDialog, taskListHeading, $event)">
+    <h2 id="delete-task-title">Delete task?</h2>
+    <p class="delete-task-name" id="delete-task-name">{{ taskToDelete()?.title }}</p>
+    <p id="delete-task-description">The task will be permanently removed.</p>
+    @if (deleteError()) {
+      <p class="error" role="alert">{{ deleteError() }}</p>
+    }
+    <div class="dialog-actions">
+      <button autofocus type="button" class="secondary cancel-delete" [disabled]="deleting()"
+        (click)="cancelDelete(deleteDialog, taskListHeading)">Cancel</button>
+      <button type="button" class="danger confirm-delete" [disabled]="deleting() || deleteUnavailable()"
+        (click)="confirmDelete(deleteDialog, taskListHeading)">{{ deleting() ? 'Deleting…' : 'Delete' }}</button>
+    </div>
+  </dialog>
 </main>

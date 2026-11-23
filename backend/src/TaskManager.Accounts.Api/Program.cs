@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Diagnostics;
 using TaskManager.Application.Accounts;
 using TaskManager.Infrastructure;
 using TaskManager.Infrastructure.Accounts;
@@ -14,6 +15,8 @@ public sealed class Program
         builder.Services.AddProblemDetails();
         builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
         builder.Services.AddExceptionHandler<RequestBindingExceptionHandler>();
+        builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        builder.Services.AddSingleton<IDeveloperPageExceptionFilter, GlobalExceptionHandler>();
         builder.Services.AddHealthChecks();
         builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
             .WithOrigins(builder.Configuration.GetSection("Frontend:Origins").Get<string[]>() ?? [])
@@ -41,6 +44,7 @@ public sealed class Program
         }
 
         app.UseExceptionHandler();
+        app.UseRouting();
         app.UseCors();
         app.MapPost("/api/accounts/login", LoginEndpoint.HandleAsync)
             .AllowAnonymous();
