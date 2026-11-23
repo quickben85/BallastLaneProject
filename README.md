@@ -2,9 +2,20 @@
 
 A .NET full-stack project for the Ballast Lane V6 technical interview exercise.
 
-- [User-story template and implemented example](user%20stories/README.md)
+- [User-story template and implemented stories](user%20stories/README.md)
 - [Architecture](docs/architecture.md)
 - [Repository instructions](AGENTS.md)
+
+## Codex and Claude Code
+
+Open either tool at the repository root. Both use the shared repository instructions in [AGENTS.md](AGENTS.md) and the same workflows.
+
+| Workflow | Codex | Claude Code |
+| --- | --- | --- |
+| Set up and verify the app | `$setup-local-app Docker Compose with demo sign-in` | `/setup-local-app Docker Compose with demo sign-in` |
+| Implement a vertical slice | `$implement-use-case <use-case details>` | `/implement-use-case <use-case details>` |
+
+The workflow files live in [.agents/skills](.agents/skills). The [.claude/skills](.claude/skills) entries load those same files and read `AGENTS.md` explicitly, including on Claude Code versions that predate automatic loading of `AGENTS.md`.
 
 ## Full-stack setup
 
@@ -19,7 +30,7 @@ docker compose version
 
 **1. Generate the signing keys and local database settings**
 
-In Codex, invoke [`$setup-local-app`](.agents/skills/setup-local-app/SKILL.md) with “Docker Compose with demo sign-in” to perform and verify the full setup. To run the steps yourself, start by generating the keys and settings with this command.
+Use the [setup skill](#codex-and-claude-code) with “Docker Compose with demo sign-in” to automate and verify the full setup. For manual setup, generate the keys and settings with this command.
 
 ```text
 dotnet run --file .agents/skills/setup-local-app/scripts/GenerateKeys.cs
@@ -67,7 +78,7 @@ Install the .NET 10 SDK, Node.js 24 with npm, and a local [PostgreSQL 18 server 
 
 **1. Generate keys and provision PostgreSQL**
 
-In Codex, invoke [`$setup-local-app`](.agents/skills/setup-local-app/SKILL.md) with “native setup with demo sign-in” to use this workflow. For manual setup, run the .NET helper from the repository root and connect to local PostgreSQL.
+Use the [setup skill](#codex-and-claude-code) with “native setup with demo sign-in” to automate this workflow. For manual setup, run the .NET helper from the repository root and connect to local PostgreSQL.
 
 ```text
 dotnet run --file .agents/skills/setup-local-app/scripts/GenerateKeys.cs
@@ -161,7 +172,7 @@ $env:Frontend__Origins__0 = 'http://localhost:4200'
 dotnet run --project backend/src/TaskManager.Tasks.Api --no-launch-profile -- --urls http://127.0.0.1:5082
 ```
 
-Both APIs apply migrations in Development. Accounts also creates the demo account with `Demo__Seed=true`. Check that [Accounts API](http://localhost:5081/_internal/live) and [Tasks API](http://localhost:5082/_internal/live) both respond with `Healthy`.
+Both APIs apply migrations in Development. Accounts creates the demo account with `Demo__Seed=true`. Check that [Accounts API](http://localhost:5081/_internal/live) and [Tasks API](http://localhost:5082/_internal/live) both respond with `Healthy`.
 
 **4. Start Angular in terminal 3**
 
@@ -180,7 +191,7 @@ Press Ctrl+C in each terminal to stop the frontend and APIs. PostgreSQL keeps th
 | --- | --- |
 | `demo@example.test` | `DemoTasks!2026` |
 
-Compose reads `DEMO_SEED=true` from `.env`. For native runs, the Accounts API command sets `Demo__Seed=true` in its terminal. Sign in to open the task page, then use **Sign out** to return to the form. Task CRUD and task seeding are planned for later slices.
+Compose reads `DEMO_SEED=true` from `.env`. The native instructions set `Demo__Seed=true` in the Accounts API terminal. Sign in, enter a title, add an optional description or due date, and select **Create task**. The saved task appears in your private list. Use **Sign out** to return to sign-in.
 
 ## Build and test
 
@@ -205,6 +216,5 @@ dotnet test backend/tests/TaskManager.UnitTests/TaskManager.UnitTests.csproj
 ## Planned interview walkthrough
 
 1. Introduce the selected user story. Show the two API hosts and the dependency direction.
-2. Demonstrate the public health check, then sign in with the demo account and show its seeded tasks.
+2. Demonstrate the public health check, then sign in with the demo account.
 3. Show the create-and-list flow and the recorded red–green test for the title rule. Use the API integration test to demonstrate persistence and owner isolation in PostgreSQL.
-4. Demonstrate updating and deleting a task, then register a second account and show its empty list.

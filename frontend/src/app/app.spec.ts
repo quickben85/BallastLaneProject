@@ -36,6 +36,7 @@ describe('Sign-in flow', () => {
     request.flush({ accessToken: 'token', expiresInSeconds: 900 });
     await harness.fixture.whenStable();
 
+    TestBed.inject(HttpTestingController).expectOne('http://localhost:5082/api/tasks').flush([]);
     expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe('Your tasks');
     expect(TestBed.inject(SESSION).token()).toBe('token');
     harness.routeNativeElement?.querySelector('button')?.click();

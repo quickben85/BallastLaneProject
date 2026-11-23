@@ -1,0 +1,118 @@
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { appConfig } from '../app.config';
+import { SESSION } from '../features/auth/session-state';
+
+const tasksUrl = 'http://localhost:5082/api/tasks';
+
+describe('Task creation', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [...appConfig.providers, provideHttpClientTesting()],
+    });
+    TestBed.inject(SESSION).start({ accessToken: 'token', expiresInSeconds: 900 });
+  });
+
+  afterEach(() => {
+    TestBed.inject(HttpTestingController).verify();
+    TestBed.inject(SESSION).end();
+  });
+
+  it('saves the task and retries a failed list reload without saving again', async () => {
+    const requests = TestBed.inject(HttpTestingController);
+    const page = await RouterTestingHarness.create('/tasks');
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([]);
+    const screen = page.routeNativeElement!;
+    const title = screen.querySelector<HTMLInputElement>('#task-title')!;
+    const date = screen.querySelector<HTMLInputElement>('#task-due-date')!;
+    change(title, 'Prepare handoff');
+    change(date, '2099-11-22');
+    submit(screen);
+
+    const save = requests.expectOne({ method: 'POST', url: tasksUrl });
+    expect(save.request.headers.get('Authorization')).toBe('Bearer token');
+    expect(save.request.body).toMatchObject({ title: 'Prepare handoff', dueDate: '2099-11-22' });
+    expect(save.request.body.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    const item = { id: 'task-1', title: 'Prepare handoff', status: 'open', dueDate: '2099-11-22' };
+    save.flush(item, { status: 201, statusText: 'Created' });
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush({}, { status: 500, statusText: 'Error' });
+    page.detectChanges();
+
+    expect(title.value).toBe('');
+    expect(screen.querySelector('[role="status"]')?.textContent).toContain('Task saved.');
+    expect(screen.querySelector('[role="alert"]')?.textContent).toContain('Could not load your tasks.');
+    screen.querySelector<HTMLButtonElement>('.retry')!.click();
+
+    requests.expectNone({ method: 'POST', url: tasksUrl });
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([item]);
+    page.detectChanges();
+    expect(screen.querySelector('.task-list')?.textContent).toContain('Prepare handoff');
+    expect(screen.querySelector('time')?.textContent).toBe('2099-11-22');
+  });
+
+  it('preserves input on a rejected save and associates server errors with the field', async () => {
+    const requests = TestBed.inject(HttpTestingController);
+    const page = await RouterTestingHarness.create('/tasks');
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([]);
+    const screen = page.routeNativeElement!;
+    const title = screen.querySelector<HTMLInputElement>('#task-title')!;
+    const description = screen.querySelector<HTMLTextAreaElement>('#task-description')!;
+    change(title, 'Keep this title');
+    change(description, 'Keep this description');
+    submit(screen);
+
+    requests.expectOne({ method: 'POST', url: tasksUrl }).flush(
+      { errors: { title: ['Check the title.'] } },
+      { status: 400, statusText: 'Bad Request' },
+    );
+    page.detectChanges();
+
+    expect(title.value).toBe('Keep this title');
+    expect(description.value).toBe('Keep this description');
+    expect(title.getAttribute('aria-describedby')).toBe('task-title-error');
+    expect(screen.querySelector('[role="alert"]')?.textContent).toContain('Check the title.');
+    requests.expectNone({ method: 'GET', url: tasksUrl });
+  });
+
+  it('blocks blank titles and past due dates before sending a save request', async () => {
+    const requests = TestBed.inject(HttpTestingController);
+    const page = await RouterTestingHarness.create('/tasks');
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([]);
+    const screen = page.routeNativeElement!;
+    change(screen.querySelector<HTMLInputElement>('#task-title')!, '   ');
+    change(screen.querySelector<HTMLInputElement>('#task-due-date')!, '2000-01-01');
+    submit(screen);
+    page.detectChanges();
+
+    requests.expectNone({ method: 'POST', url: tasksUrl });
+    expect(screen.querySelector('#task-title-error')?.textContent).toContain('Enter a title');
+    expect(screen.querySelector('#task-due-date-error')?.textContent).toContain('today or later');
+  });
+
+  it('preserves the form and blocks a partially entered date', async () => {
+    const requests = TestBed.inject(HttpTestingController);
+    const page = await RouterTestingHarness.create('/tasks');
+    requests.expectOne({ method: 'GET', url: tasksUrl }).flush([]);
+    const screen = page.routeNativeElement!;
+    const title = screen.querySelector<HTMLInputElement>('#task-title')!;
+    const date = screen.querySelector<HTMLInputElement>('#task-due-date')!;
+    change(title, 'Keep the draft');
+    Object.defineProperty(date, 'validity', { value: { badInput: true } });
+    submit(screen);
+    page.detectChanges();
+
+    requests.expectNone({ method: 'POST', url: tasksUrl });
+    expect(title.value).toBe('Keep the draft');
+    expect(screen.querySelector('#task-due-date-error')?.textContent).toContain('complete date');
+  });
+});
+
+function change(control: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+  control.value = value;
+  control.dispatchEvent(new Event('input'));
+}
+
+function submit(screen: HTMLElement): void {
+  screen.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+}

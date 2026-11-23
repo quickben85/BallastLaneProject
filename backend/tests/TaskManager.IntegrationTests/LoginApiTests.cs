@@ -92,7 +92,7 @@ public sealed class LoginApiTests(LoginFixture fixture) : IClassFixture<LoginFix
     }
 
     [Fact]
-    public async Task DemoAccountCanSignInAndTokenAuthenticatesWithTasksHost()
+    public async Task DemoAccountCanSignInAndStartsWithAnEmptyTaskList()
     {
         using var client = fixture.Accounts.CreateClient();
         using var response = await client.PostAsJsonAsync("/api/accounts/login",
@@ -111,6 +111,10 @@ public sealed class LoginApiTests(LoginFixture fixture) : IClassFixture<LoginFix
 
         Assert.True(result.Succeeded, result.Failure?.Message);
         Assert.Equal("ea9dd2dc-5959-4ca7-b98d-a38923c31aff", result.Principal?.FindFirst("sub")?.Value);
+
+        using var tasks = fixture.Tasks.CreateClient();
+        tasks.DefaultRequestHeaders.Authorization = new("Bearer", login.AccessToken);
+        Assert.Empty((await tasks.GetFromJsonAsync<TaskResponse[]>("/api/tasks"))!);
     }
 
     [Fact]
