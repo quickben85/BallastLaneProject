@@ -2,6 +2,8 @@ using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using TaskManager.Application.Tasks;
+using TaskManager.Domain.Tasks;
+using TaskStatus = TaskManager.Domain.Tasks.TaskStatus;
 
 namespace TaskManager.Tasks.Api;
 
@@ -13,6 +15,7 @@ internal static class TaskEndpoints
         tasks.MapPost("", CreateAsync);
         tasks.MapGet("", ListAsync);
         tasks.MapGet("/{id:guid}", GetAsync).WithName("GetTaskById");
+        tasks.MapPut("/{id:guid}", UpdateAsync);
     }
 
     private static async Task<IResult> CreateAsync(
@@ -33,6 +36,33 @@ internal static class TaskEndpoints
             return Results.CreatedAtRoute("GetTaskById", new { id = task.Id }, TaskResource.From(task));
         }
 
+        return WriteValidationProblem(result);
+    }
+
+    private static async Task<IResult> UpdateAsync(Guid id, [FromBody] UpdateTaskRequest request,
+        IValidator<UpdateTaskRequest> validator, IUpdateTask updateTask, ClaimsPrincipal user,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return Results.ValidationProblem(validation.ToDictionary());
+        }
+
+        var zone = request.TimeZone is null ? TimeZoneInfo.Utc : TimeZoneInfo.FindSystemTimeZoneById(request.TimeZone);
+        var status = request.Status == "open" ? TaskStatus.Open : TaskStatus.Completed;
+        var result = await updateTask.ExecuteAsync(id, OwnerId(user), request.Title, request.Description, status,
+            request.DueDate, zone, cancellationToken);
+        if (result is null)
+        {
+            return Results.NotFound();
+        }
+
+        return result.Item is { } task ? Results.Ok(TaskResource.From(task)) : WriteValidationProblem(result);
+    }
+
+    private static IResult WriteValidationProblem(TaskWriteResult result)
+    {
         var errors = new Dictionary<string, string[]>();
         if (result.TitleError is { } titleError)
         {

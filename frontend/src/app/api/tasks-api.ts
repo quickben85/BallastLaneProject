@@ -4,6 +4,7 @@ import { TASKS_API_ORIGIN } from './api-origins';
 import { CreateTaskRequest } from './create-task-request';
 import { TaskSummary } from './task-summary';
 import { TasksClient } from './tasks-client';
+import { UpdateTaskRequest } from './update-task-request';
 
 @Injectable()
 export class TasksApi implements TasksClient {
@@ -12,6 +13,10 @@ export class TasksApi implements TasksClient {
 
   create(request: CreateTaskRequest) {
     return this.http.post<TaskSummary>(this.endpoint, request);
+  }
+
+  update(id: string, request: UpdateTaskRequest) {
+    return this.http.put<TaskSummary>(`${this.endpoint}/${encodeURIComponent(id)}`, request);
   }
 
   list() {

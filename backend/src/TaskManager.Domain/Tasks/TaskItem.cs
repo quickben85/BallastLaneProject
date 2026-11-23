@@ -19,19 +19,27 @@ public sealed class TaskItem
     public TaskStatus Status { get; }
     public DateOnly? DueDate { get; }
 
-    public static TaskCreationResult Create(
-        Guid ownerId, string? title, string? description, DateOnly? dueDate, DateOnly today)
+    public static TaskWriteResult Create(
+        Guid ownerId, string? title, string? description, DateOnly? dueDate, DateOnly today) =>
+        Write(Guid.NewGuid(), ownerId, title, description, TaskStatus.Open, dueDate, today, existingDueDate: null);
+
+    public TaskWriteResult Update(
+        string? title, string? description, TaskStatus status, DateOnly? dueDate, DateOnly today) =>
+        Write(Id, OwnerId, title, description, status, dueDate, today, DueDate);
+
+    private static TaskWriteResult Write(Guid id, Guid ownerId, string? title, string? description,
+        TaskStatus status, DateOnly? dueDate, DateOnly today, DateOnly? existingDueDate)
     {
         var trimmedTitle = title?.Trim();
-        var (titleError, dueDateError) = TaskCreationValidator.Validate(new(trimmedTitle, dueDate, today));
+        var (titleError, dueDateError) = TaskDetailsValidator.Validate(new(trimmedTitle, dueDate, today, existingDueDate));
         if (titleError is not null || dueDateError is not null)
         {
-            return new TaskCreationResult(null, titleError, dueDateError);
+            return new TaskWriteResult(null, titleError, dueDateError);
         }
 
-        var task = new TaskItem(Guid.NewGuid(), ownerId, trimmedTitle!,
-            string.IsNullOrWhiteSpace(description) ? null : description, TaskStatus.Open, dueDate);
-        return new TaskCreationResult(task);
+        var task = new TaskItem(id, ownerId, trimmedTitle!,
+            string.IsNullOrWhiteSpace(description) ? null : description, status, dueDate);
+        return new TaskWriteResult(task);
     }
 
     public static TaskItem Restore(

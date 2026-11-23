@@ -4,7 +4,7 @@ namespace TaskManager.Application.Tasks;
 
 public sealed class CreateTask(ITaskRepository tasks, TimeProvider clock) : ICreateTask
 {
-    public async Task<TaskCreationResult> ExecuteAsync(Guid ownerId, string? title, string? description,
+    public async Task<TaskWriteResult> ExecuteAsync(Guid ownerId, string? title, string? description,
         DateOnly? dueDate, TimeZoneInfo timeZone, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), timeZone).DateTime);
